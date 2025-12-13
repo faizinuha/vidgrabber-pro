@@ -35,4 +35,8 @@ TikTok / IG / YouTube / FB 👇
 
 ━━━━━━━━━━━━━━━━━
 Powered by @CobaltApi  
-@anantasatriaa
+
+
+npm run build
+npx cap sync
+npx @capgo/cli upload
