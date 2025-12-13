@@ -1,0 +1,10 @@
+project_id = "ynymvsgudemzvajjfvtw"
+
+[functions.download-video]
+verify_jwt = false
+
+[functions.trakteer-webhook]
+verify_jwt = false
+
+[functions.verify-token]
+verify_jwt = false
