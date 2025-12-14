@@ -44,7 +44,6 @@ export function LegalNotice() {
             <strong className="text-foreground">APi :</strong> Layan ini Menggunakan Api 
             Dari sumberny dari @CobaltApi Terima kasih
           </p>
-          
         </div>
       </div>
     </section>

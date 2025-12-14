@@ -42,6 +42,11 @@ const faqItems: FAQItem[] = [
     answer:
       "Saat ini kami mendukung TikTok, Instagram (Reels & Posts), Facebook, dan YouTube. Kami akan terus menambah platform lain di masa depan.",
   },
+  {
+    question: "Kenapa Fitur 4k Terkunci padahal Saya sudah Donate?",
+    answer:
+      "Jika Mengalamai Terkunci , Copy Transaction ID dan Masukan ke input verifikasi."
+  }
 ];
 
 export function FAQ() {
