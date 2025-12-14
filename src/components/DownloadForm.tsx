@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Download, Link2, Music, Video, Sparkles, ExternalLink, CheckCircle, XCircle, Loader2, Image, Eye, AlertCircle, User, FileText, Globe, Copyright, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { AlertCircle, CheckCircle, Copyright, Download, ExternalLink, Eye, FileText, Globe, Image, Info, Link2, Loader2, Music, Sparkles, User, Video, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type Platform = "tiktok" | "instagram" | "facebook" | "youtube" | null;
 type Format = "video" | "audio";
@@ -58,19 +58,19 @@ export function DownloadForm() {
   const [has4KAccess, setHas4KAccess] = useState(false);
   const [transactionId, setTransactionId] = useState<string>("");
   const [isVerifying, setIsVerifying] = useState(false);
-  
+
   // Image download states
   const [imageUrl, setImageUrl] = useState("");
   const [imageDownloading, setImageDownloading] = useState(false);
   const [imagePreviewError, setImagePreviewError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  
+
   const { toast } = useToast();
 
   useEffect(() => {
     // Check if user has 4K access from cookie
     const access = getCookie(DONATION_COOKIE_KEY);
-    
+
     if (access === "true") {
       setHas4KAccess(true);
     }
@@ -91,7 +91,7 @@ export function DownloadForm() {
     try {
       // Check if input looks like a UUID (token) or transaction ID
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input);
-      
+
       const { data, error } = await supabase.functions.invoke('verify-token', {
         body: isUUID ? { token: input } : { transaction_id: input }
       });
@@ -102,7 +102,7 @@ export function DownloadForm() {
         setHas4KAccess(true);
         toast({
           title: "Verifikasi Berhasil!",
-          description: data.supporter_name 
+          description: data.supporter_name
             ? `Terima kasih ${data.supporter_name}! Akses 4K aktif.`
             : "Akses 4K berhasil diaktifkan.",
         });
@@ -135,9 +135,9 @@ export function DownloadForm() {
 
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [pickerOptions, setPickerOptions] = useState<Array<{ id: number; url: string; thumbnail?: string; type: string }>>([]);
-  const [videoMetadata, setVideoMetadata] = useState<{ 
-    title?: string; 
-    author?: string; 
+  const [videoMetadata, setVideoMetadata] = useState<{
+    title?: string;
+    author?: string;
     platform?: string;
     filename?: string;
     thumbnail?: string;
@@ -242,10 +242,10 @@ export function DownloadForm() {
 
     try {
       const quality = resolution === "4k" ? "4k" : resolution === "1080p" ? "1080" : "720";
-      
+
       const { data, error } = await supabase.functions.invoke('download-video', {
-        body: { 
-          url, 
+        body: {
+          url,
           quality,
           format: format === "audio" ? "mp3" : "mp4"
         }
@@ -422,7 +422,7 @@ export function DownloadForm() {
                   className="w-28 h-28"
                 />
               </div>
-              
+
               {/* Instructions */}
               <div className="flex-1 space-y-2 text-center sm:text-left">
                 <div className="font-semibold flex items-center justify-center sm:justify-start gap-2">
@@ -430,22 +430,22 @@ export function DownloadForm() {
                   Akses Resolusi 4K
                 </div>
                 <p className="text-xs opacity-80">
-                  1. Scan QR Code atau klik tombol donate<br/>
-                  2. Selesaikan pembayaran di Trakteer<br/>
+                  1. Scan QR Code atau klik tombol donate<br />
+                  2. Selesaikan pembayaran di Trakteer<br />
                   3. Masukkan Transaction ID untuk verifikasi
                 </p>
                 <a
                   href={TRAKTEER_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-warning text-warning-foreground rounded-lg text-xs font-medium hover:bg-warning/90 transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-black text-white-foreground rounded-lg text-xs font-medium hover:bg-warning/90 transition-colors"
                 >
                   <ExternalLink className="w-3 h-3" />
                   Buka Trakteer
                 </a>
               </div>
             </div>
-            
+
             {/* Transaction ID verification */}
             <div className="mt-3 pt-3 border-t border-warning/20">
               <div className="flex gap-2">
@@ -529,7 +529,7 @@ export function DownloadForm() {
                 </span>
               )}
             </div>
-            
+
             {/* Music Copyright Info Section */}
             <div className="mt-3 pt-3 border-t border-border">
               <div className="flex items-center gap-2 mb-2">
@@ -566,7 +566,7 @@ export function DownloadForm() {
                     </p>
                   </div>
                 )}
-                
+
                 {/* Credit Section */}
                 <div className="pt-2 border-t border-warning/10">
                   <p className="text-xs text-muted-foreground leading-relaxed">
@@ -579,7 +579,7 @@ export function DownloadForm() {
                     )}
                     {videoMetadata.musicInfo?.author && (
                       <>
-                        <br/>
+                        <br />
                         <strong className="text-foreground">Credit Musik:</strong>{' '}
                         <span className="font-medium text-warning">{videoMetadata.musicInfo.author}</span>
                         {videoMetadata.musicInfo.title && <> - "{videoMetadata.musicInfo.title}"</>}
@@ -617,9 +617,9 @@ export function DownloadForm() {
                 {downloadStatus === "downloading" && `${Math.round(downloadProgress)}%`}
               </span>
             </div>
-            
-            <Progress 
-              value={downloadStatus === "fetching" ? 10 : downloadProgress} 
+
+            <Progress
+              value={downloadStatus === "fetching" ? 10 : downloadProgress}
               className="h-2"
             />
 
@@ -677,7 +677,7 @@ export function DownloadForm() {
                         </span>
                       </div>
                     )}
-                    
+
                     {/* Music Copyright Info in Complete Section */}
                     <div className="mt-3 pt-3 border-t border-border">
                       <div className="flex items-center gap-2 mb-2">
@@ -719,7 +719,7 @@ export function DownloadForm() {
                           {videoMetadata.author && <> • {videoMetadata.author}</>}
                           {videoMetadata.musicInfo?.author && (
                             <>
-                              <br/>
+                              <br />
                               <strong>Credit Musik:</strong> {videoMetadata.musicInfo.author}
                               {videoMetadata.musicInfo.title && <> - "{videoMetadata.musicInfo.title}"</>}
                             </>
@@ -754,9 +754,9 @@ export function DownloadForm() {
                     Download Lagi
                   </Button>
                   {downloadUrl && (
-                    <Button 
-                      variant="accent" 
-                      size="sm" 
+                    <Button
+                      variant="accent"
+                      size="sm"
                       className="flex-1"
                       onClick={() => triggerDownload(downloadUrl)}
                     >
@@ -811,7 +811,7 @@ export function DownloadForm() {
           <Image className="w-5 h-5 text-primary" />
           Download Gambar
         </div>
-        
+
         <div className="relative">
           <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input
@@ -845,7 +845,7 @@ export function DownloadForm() {
                 <div className="flex flex-col items-center justify-center h-48 text-destructive">
                   <AlertCircle className="w-8 h-8 mb-2" />
                   <p className="text-sm">Gagal memuat gambar</p>
-                  <p className="text-xs text-muted-foreground">Pastikan URL gambar valid</p>
+                  <p className="text-xs text-muted-foreground">Preview gagal, Anda tetap bisa mencoba tombol download</p>
                 </div>
               )}
               <img
@@ -884,14 +884,8 @@ export function DownloadForm() {
               });
               return;
             }
-            if (imagePreviewError) {
-              toast({
-                title: "Gambar Tidak Valid",
-                description: "URL gambar tidak dapat dimuat, pastikan URL benar",
-                variant: "destructive",
-              });
-              return;
-            }
+            // Allow download even if preview fails (CORS etc)
+
             setImageDownloading(true);
             const a = document.createElement('a');
             a.href = imageUrl;
@@ -908,7 +902,7 @@ export function DownloadForm() {
               });
             }, 1000);
           }}
-          disabled={!imageUrl || imageDownloading || imagePreviewError}
+          disabled={!imageUrl || imageDownloading}
         >
           {imageDownloading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -917,7 +911,7 @@ export function DownloadForm() {
           )}
           Download Gambar
         </Button>
-        
+
         <p className="text-xs text-muted-foreground text-center">
           Masukkan URL langsung ke gambar (contoh: https://example.com/image.jpg)
         </p>
