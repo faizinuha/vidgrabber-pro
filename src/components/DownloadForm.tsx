@@ -307,7 +307,6 @@ export function DownloadForm() {
   const triggerDownload = (downloadLink: string) => {
     const a = document.createElement('a');
     a.href = downloadLink;
-    a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.click();
   };
