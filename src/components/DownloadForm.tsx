@@ -304,11 +304,28 @@ export function DownloadForm() {
     }
   };
 
-  const triggerDownload = (downloadLink: string) => {
-    const a = document.createElement('a');
-    a.href = downloadLink;
-    a.rel = 'noopener noreferrer';
-    a.click();
+  const triggerDownload = async (downloadLink: string, fileName?: string) => {
+    try {
+      const response = await fetch(downloadLink);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || videoMetadata?.filename || 'download';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error("Download fallback", e);
+      const a = document.createElement('a');
+      a.href = downloadLink;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = fileName || videoMetadata?.filename || 'download';
+      a.click();
+    }
   };
 
   const resetDownload = () => {
@@ -737,7 +754,7 @@ export function DownloadForm() {
                         key={option.id}
                         variant="outline"
                         size="sm"
-                        onClick={() => triggerDownload(option.url)}
+                        onClick={() => triggerDownload(option.url, `${videoMetadata?.filename || 'video'}-${idx + 1}`)}
                         className="flex flex-col h-auto py-2"
                       >
                         <Download className="w-4 h-4 mb-1" />
@@ -757,7 +774,7 @@ export function DownloadForm() {
                       variant="accent"
                       size="sm"
                       className="flex-1"
-                      onClick={() => triggerDownload(downloadUrl)}
+                      onClick={() => triggerDownload(downloadUrl, videoMetadata?.filename)}
                     >
                       <Download className="w-4 h-4 mr-1" />
                       Simpan File
