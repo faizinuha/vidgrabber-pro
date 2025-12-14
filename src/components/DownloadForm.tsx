@@ -64,10 +64,6 @@ export function DownloadForm() {
   const [imageDownloading, setImageDownloading] = useState(false);
   const [imagePreviewError, setImagePreviewError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageSocialMedia, setImageSocialMedia] = useState<Platform>(null);
-  const [imagePickerOptions, setImagePickerOptions] = useState<Array<{ id: number; url: string; thumbnail?: string; type: string }>>([]);
-  const [imageDownloadingItems, setImageDownloadingItems] = useState<Set<number>>(new Set());
-  const [imageFetchedUrls, setImageFetchedUrls] = useState<string[]>([]);
   
   const { toast } = useToast();
 
@@ -137,9 +133,8 @@ export function DownloadForm() {
     setDownloadProgress(0);
   };
 
-const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [pickerOptions, setPickerOptions] = useState<Array<{ id: number; url: string; thumbnail?: string; type: string }>>([]);
-  const [downloadingItems, setDownloadingItems] = useState<Set<number>>(new Set());
   const [videoMetadata, setVideoMetadata] = useState<{ 
     title?: string; 
     author?: string; 
@@ -309,54 +304,12 @@ const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
     }
   };
 
-const triggerDownload = (downloadLink: string, itemId?: number) => {
-    if (itemId !== undefined) {
-      setDownloadingItems(prev => new Set(prev).add(itemId));
-    }
-    
+  const triggerDownload = (downloadLink: string) => {
     const a = document.createElement('a');
     a.href = downloadLink;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.click();
-    
-    // Remove from downloading state after a short delay
-    if (itemId !== undefined) {
-      setTimeout(() => {
-        setDownloadingItems(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(itemId);
-          return newSet;
-        });
-      }, 2000);
-    }
-  };
-
-  const downloadAllItems = async () => {
-    if (pickerOptions.length === 0) return;
-    
-    toast({
-      title: "Mengunduh Semua File",
-      description: `Mengunduh ${pickerOptions.length} file...`,
-    });
-    
-    // Download each item with a small delay to avoid browser blocking
-    for (let i = 0; i < pickerOptions.length; i++) {
-      const option = pickerOptions[i];
-      setDownloadingItems(prev => new Set(prev).add(option.id));
-      
-      triggerDownload(option.url);
-      
-      // Wait a bit between downloads
-      if (i < pickerOptions.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
-    // Clear all downloading states after a delay
-    setTimeout(() => {
-      setDownloadingItems(new Set());
-    }, 2000);
   };
 
   const resetDownload = () => {
@@ -777,96 +730,21 @@ const triggerDownload = (downloadLink: string, itemId?: number) => {
                   </div>
                 )}
 
-                {/* Picker options for multiple files - Carousel/Gallery */}
+                {/* Picker options for multiple files */}
                 {pickerOptions.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {pickerOptions.length} File Tersedia
-                      </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {pickerOptions.map((option, idx) => (
                       <Button
-                        variant="default"
+                        key={option.id}
+                        variant="outline"
                         size="sm"
-                        onClick={downloadAllItems}
-                        className="gap-1"
+                        onClick={() => triggerDownload(option.url)}
+                        className="flex flex-col h-auto py-2"
                       >
-                        <Download className="w-4 h-4" />
-                        Download Semua
+                        <Download className="w-4 h-4 mb-1" />
+                        <span className="text-xs">File {idx + 1}</span>
                       </Button>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {pickerOptions.map((option, idx) => (
-                        <div
-                          key={option.id}
-                          className="relative group rounded-lg overflow-hidden border border-border bg-secondary/30"
-                        >
-                          {/* Thumbnail Preview */}
-                          {option.thumbnail ? (
-                            <img
-                              src={option.thumbnail}
-                              alt={`File ${idx + 1}`}
-                              className="w-full h-24 sm:h-32 object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/placeholder.svg';
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-24 sm:h-32 flex items-center justify-center bg-secondary">
-                              {option.type === 'video' ? (
-                                <Video className="w-8 h-8 text-muted-foreground" />
-                              ) : (
-                                <Image className="w-8 h-8 text-muted-foreground" />
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Type badge */}
-                          <span className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-black/60 text-white">
-                            {option.type === 'video' ? 'VIDEO' : 'IMAGE'}
-                          </span>
-                          
-                          {/* Index badge */}
-                          <span className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full bg-primary text-primary-foreground">
-                            {idx + 1}
-                          </span>
-                          
-                          {/* Download button overlay */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => triggerDownload(option.url, option.id)}
-                              disabled={downloadingItems.has(option.id)}
-                              className="gap-1"
-                            >
-                              {downloadingItems.has(option.id) ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Download className="w-4 h-4" />
-                              )}
-                              Download
-                            </Button>
-                          </div>
-                          
-                          {/* Mobile download button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => triggerDownload(option.url, option.id)}
-                            disabled={downloadingItems.has(option.id)}
-                            className="absolute bottom-0 left-0 right-0 rounded-none bg-black/60 text-white hover:bg-black/80 sm:hidden h-8 text-xs"
-                          >
-                            {downloadingItems.has(option.id) ? (
-                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                            ) : (
-                              <Download className="w-3 h-3 mr-1" />
-                            )}
-                            Download
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 )}
 
@@ -938,36 +816,20 @@ const triggerDownload = (downloadLink: string, itemId?: number) => {
           <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input
             type="url"
-            placeholder="Paste URL gambar atau sosial media..."
+            placeholder="Paste URL gambar di sini..."
             value={imageUrl}
             onChange={(e) => {
-              const val = e.target.value;
-              setImageUrl(val);
+              setImageUrl(e.target.value);
               setImagePreviewError(false);
               setImageLoaded(false);
-              setImageSocialMedia(detectPlatform(val));
-              setImagePickerOptions([]);
-              setImageFetchedUrls([]);
             }}
             disabled={imageDownloading}
             className="pl-12 h-14 text-base bg-secondary/50 border-border focus:border-primary"
           />
         </div>
 
-        {/* Social media badge */}
-        {imageSocialMedia && (
-          <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${platformColors[imageSocialMedia]}`}>
-              {imageSocialMedia.charAt(0).toUpperCase() + imageSocialMedia.slice(1)}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Akan diproses via API
-            </span>
-          </div>
-        )}
-
-        {/* Image Preview for direct URLs */}
-        {imageUrl && !imageSocialMedia && (
+        {/* Image Preview */}
+        {imageUrl && (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Eye className="w-4 h-4" />
@@ -1009,119 +871,11 @@ const triggerDownload = (downloadLink: string, itemId?: number) => {
           </div>
         )}
 
-        {/* Picker options for social media multi-image */}
-        {imagePickerOptions.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">
-                {imagePickerOptions.length} Gambar Ditemukan
-              </span>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={async () => {
-                  for (const option of imagePickerOptions) {
-                    await triggerImageItemDownload(option.url, option.id);
-                  }
-                }}
-                className="gap-1"
-              >
-                <Download className="w-4 h-4" />
-                Download Semua
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {imagePickerOptions.map((option, idx) => (
-                <div
-                  key={option.id}
-                  className="relative group rounded-lg overflow-hidden border border-border bg-secondary/30"
-                >
-                  {option.thumbnail ? (
-                    <img
-                      src={option.thumbnail}
-                      alt={`Gambar ${idx + 1}`}
-                      className="w-full h-24 sm:h-32 object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder.svg';
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-24 sm:h-32 flex items-center justify-center bg-secondary">
-                      <Image className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                  )}
-                  
-                  <span className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-black/60 text-white">
-                    {option.type === 'video' ? 'VIDEO' : 'IMAGE'}
-                  </span>
-                  
-                  <span className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full bg-primary text-primary-foreground">
-                    {idx + 1}
-                  </span>
-                  
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => triggerImageItemDownload(option.url, option.id)}
-                      disabled={imageDownloadingItems.has(option.id)}
-                      className="gap-1"
-                    >
-                      {imageDownloadingItems.has(option.id) ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
-                      Download
-                    </Button>
-                  </div>
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => triggerImageItemDownload(option.url, option.id)}
-                    disabled={imageDownloadingItems.has(option.id)}
-                    className="absolute bottom-0 left-0 right-0 rounded-none bg-black/60 text-white hover:bg-black/80 sm:hidden h-8 text-xs"
-                  >
-                    {imageDownloadingItems.has(option.id) ? (
-                      <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                    ) : (
-                      <Download className="w-3 h-3 mr-1" />
-                    )}
-                    Download
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Single fetched URL */}
-        {imageFetchedUrls.length === 1 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Eye className="w-4 h-4" />
-              Preview Gambar
-            </div>
-            <div className="relative rounded-lg overflow-hidden bg-secondary/30 border border-border">
-              <img
-                src={imageFetchedUrls[0]}
-                alt="Preview"
-                className="w-full max-h-64 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/placeholder.svg';
-                }}
-              />
-            </div>
-          </div>
-        )}
-
         <Button
           variant="accent"
           size="lg"
           className="w-full"
-          onClick={async () => {
+          onClick={() => {
             if (!imageUrl) {
               toast({
                 title: "URL Kosong",
@@ -1130,61 +884,6 @@ const triggerDownload = (downloadLink: string, itemId?: number) => {
               });
               return;
             }
-
-            // Handle social media URL via Cobalt API
-            if (imageSocialMedia) {
-              setImageDownloading(true);
-              try {
-                const { data, error } = await supabase.functions.invoke('download-video', {
-                  body: { url: imageUrl, format: 'video', quality: '720' }
-                });
-
-                if (error) throw error;
-
-                if (data.status === 'picker' && data.picker) {
-                  const options = data.picker.map((item: { url: string; thumb?: string; type?: string }, idx: number) => ({
-                    id: idx,
-                    url: item.url,
-                    thumbnail: item.thumb || item.url,
-                    type: item.type || 'image'
-                  }));
-                  setImagePickerOptions(options);
-                  toast({
-                    title: "Gambar Ditemukan",
-                    description: `${options.length} gambar tersedia untuk diunduh`,
-                  });
-                } else if (data.url) {
-                  setImageFetchedUrls([data.url]);
-                  // Auto download single image
-                  const a = document.createElement('a');
-                  a.href = data.url;
-                  a.download = data.filename || 'image';
-                  a.target = '_blank';
-                  a.rel = 'noopener noreferrer';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  toast({
-                    title: "Berhasil!",
-                    description: "Gambar sedang diunduh",
-                  });
-                } else {
-                  throw new Error('Tidak dapat mengambil gambar dari URL');
-                }
-              } catch (err) {
-                console.error('Error fetching social media image:', err);
-                toast({
-                  title: "Gagal",
-                  description: "Tidak dapat mengambil gambar dari URL sosial media",
-                  variant: "destructive",
-                });
-              } finally {
-                setImageDownloading(false);
-              }
-              return;
-            }
-
-            // Handle direct image URL
             if (imagePreviewError) {
               toast({
                 title: "Gambar Tidak Valid",
@@ -1209,54 +908,20 @@ const triggerDownload = (downloadLink: string, itemId?: number) => {
               });
             }, 1000);
           }}
-          disabled={!imageUrl || imageDownloading || (!imageSocialMedia && imagePreviewError)}
+          disabled={!imageUrl || imageDownloading || imagePreviewError}
         >
           {imageDownloading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
             <Download className="w-5 h-5" />
           )}
-          {imageSocialMedia ? 'Ambil Gambar' : 'Download Gambar'}
+          Download Gambar
         </Button>
         
         <p className="text-xs text-muted-foreground text-center">
-          Mendukung URL langsung ke gambar atau URL dari TikTok, Instagram, Facebook, YouTube
+          Masukkan URL langsung ke gambar (contoh: https://example.com/image.jpg)
         </p>
       </div>
     </div>
   );
-
-  // Helper function for downloading individual items from image picker
-  async function triggerImageItemDownload(downloadUrl: string, itemId: number) {
-    setImageDownloadingItems(prev => new Set([...prev, itemId]));
-    try {
-      const response = await fetch(downloadUrl);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `image_${itemId + 1}.${blob.type.split('/')[1] || 'jpg'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-      toast({
-        title: "Berhasil!",
-        description: `Gambar ${itemId + 1} sedang diunduh`,
-      });
-    } catch (err) {
-      console.error('Error downloading image:', err);
-      toast({
-        title: "Gagal",
-        description: "Tidak dapat mengunduh gambar",
-        variant: "destructive",
-      });
-    } finally {
-      setImageDownloadingItems(prev => {
-        const next = new Set(prev);
-        next.delete(itemId);
-        return next;
-      });
-    }
-  }
 }
