@@ -29,14 +29,35 @@ interface CobaltResponse {
 }
 
 // Working Cobalt instances with CORS support
+// Working Cobalt instances with CORS support
 const COBALT_INSTANCES = [
   'https://api.cobalt.tools',
-  'https://cobalt-api.kwiatekmiki.com',
   'https://cobalt-api.meowing.de',
-  'https://capi.3kh0.net',
   'https://cobalt-backend.canine.tools',
+  'https://cobalt.rudon.de',
+  'https://cobalt.perisic.com',
+  'https://cobalt.sm64.fun',
   'https://cobalt.crush-it.ru',
+  'https://api.cobalt.best',
 ];
+
+const FETCH_TIMEOUT = 12000; // 12 seconds timeout for each instance
+
+async function fetchWithTimeout(url: string, options: any) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -57,8 +78,8 @@ serve(async (req: Request): Promise<Response> => {
     );
 
     if (!url) {
-      return new Response(JSON.stringify({ error: 'URL is required' }), {
-        status: 400,
+      return new Response(JSON.stringify({ success: false, error: 'URL is required' }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -106,7 +127,7 @@ serve(async (req: Request): Promise<Response> => {
       try {
         console.log(`Trying instance: ${instance}`);
 
-        const cobaltResponse = await fetch(instance, {
+        const cobaltResponse = await fetchWithTimeout(instance, {
           method: 'POST',
           headers: {
             Accept: 'application/json',
