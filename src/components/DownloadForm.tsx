@@ -61,6 +61,7 @@ export function DownloadForm() {
 
   // Image download states
   const [imageUrl, setImageUrl] = useState("");
+  const [imageFormat, setImageFormat] = useState<"png" | "jpg" | "webp">("jpg");
   const [imageDownloading, setImageDownloading] = useState(false);
   const [imagePreviewError, setImagePreviewError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -844,6 +845,24 @@ export function DownloadForm() {
           />
         </div>
 
+        {/* Image Format Selection */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground">Opsi Format Gambar</label>
+          <div className="flex gap-2">
+            {(["jpg", "png", "webp"] as const).map((fmt) => (
+              <Button
+                key={fmt}
+                variant={imageFormat === fmt ? "default" : "outline"}
+                onClick={() => setImageFormat(fmt)}
+                disabled={imageDownloading}
+                className="flex-1 uppercase"
+              >
+                {fmt}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         {/* Image Preview */}
         {imageUrl && (
           <div className="space-y-2">
@@ -865,7 +884,7 @@ export function DownloadForm() {
                 </div>
               )}
               <img
-                src={imageUrl}
+                src={imageUrl.startsWith('http') ? `https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}&w=600` : imageUrl}
                 alt="Preview"
                 className={`w-full max-h-64 object-contain ${imageLoaded && !imagePreviewError ? 'block' : 'hidden'}`}
                 onLoad={() => {
@@ -891,7 +910,7 @@ export function DownloadForm() {
           variant="accent"
           size="lg"
           className="w-full"
-          onClick={() => {
+          onClick={async () => {
             if (!imageUrl) {
               toast({
                 title: "URL Kosong",
@@ -900,32 +919,115 @@ export function DownloadForm() {
               });
               return;
             }
-            // Allow download even if preview fails (CORS etc)
 
             setImageDownloading(true);
-            const a = document.createElement('a');
-            a.href = imageUrl;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            a.click();
-            setTimeout(() => {
-              setImageDownloading(false);
-              setImageUrl("");
-              setImageLoaded(false);
+            try {
+              // Check if it's a social media URL
+              const detectedPlatform = detectPlatform(imageUrl);
+
+              if (imageUrl.startsWith('data:')) {
+                // Handle Base64 (data:) URLs directly
+                const res = await fetch(imageUrl);
+                const blob = await res.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                const mime = imageUrl.split(';')[0].split(':')[1];
+                const ext = mime.split('/')[1] || imageFormat;
+                a.download = `image-${Date.now()}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(blobUrl);
+                document.body.removeChild(a);
+              } else if (detectedPlatform) {
+                // If it's a social media URL, use the Edge function to find the actual image(s)
+                const { data, error } = await supabase.functions.invoke('download-video', {
+                  body: { url: imageUrl, previewOnly: false }
+                });
+
+                if (error || !data.success) {
+                  throw new Error(data?.error || "Gagal mendapatkan gambar dari link media sosial");
+                }
+
+                if (data.type === "picker" && data.options) {
+                  const firstImage = data.options.find((opt: any) => opt.type === "photo" || opt.type === "image") || data.options[0];
+                  if (firstImage) {
+                    const finalUrl = `https://images.weserv.nl/?url=${encodeURIComponent(firstImage.url)}&output=${imageFormat}`;
+                    await triggerDownload(finalUrl, `image-${Date.now()}.${imageFormat}`);
+                  }
+                } else if (data.thumbnail || data.downloadUrl) {
+                  const targetUrl = data.downloadUrl || data.thumbnail;
+                  const finalUrl = `https://images.weserv.nl/?url=${encodeURIComponent(targetUrl)}&output=${imageFormat}`;
+                  await triggerDownload(finalUrl, `image-${Date.now()}.${imageFormat}`);
+                }
+              } else {
+                // Regular image URL (including Google gstatic, encrypted-tbn, etc.)
+                let cleanUrl = imageUrl;
+
+                // Handle Google Image Search redirect URLs
+                if (imageUrl.includes('google.com/imgres')) {
+                  try {
+                    const urlObj = new URL(imageUrl);
+                    const imgUrl = urlObj.searchParams.get('imgurl');
+                    if (imgUrl) cleanUrl = imgUrl;
+                  } catch (e) {
+                    console.error("Failed to parse Google URL", e);
+                  }
+                }
+
+                const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(cleanUrl)}&output=${imageFormat}`;
+
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('Gagal mengunduh gambar. Pastikan ini adalah link gambar langsung.');
+
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = `image-${Date.now()}.${imageFormat}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(blobUrl);
+                document.body.removeChild(a);
+              }
+
               toast({
                 title: "Berhasil!",
-                description: "Gambar sedang diunduh di tab baru",
+                description: `Gambar telah diunduh sebagai ${imageFormat.toUpperCase()}`,
               });
-            }, 1000);
+            } catch (error: any) {
+              console.error("Image download error:", error);
+              // Fallback for regular URLs
+              if (!detectPlatform(imageUrl)) {
+                const a = document.createElement('a');
+                a.href = imageUrl;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.click();
+
+                toast({
+                  title: "Berhasil (Fallback)",
+                  description: "Gambar dibuka di tab baru untuk diunduh manual",
+                });
+              } else {
+                toast({
+                  title: "Gagal Mengunduh",
+                  description: error.message || "Terjadi kesalahan saat memproses link",
+                  variant: "destructive",
+                });
+              }
+            } finally {
+              setImageDownloading(false);
+            }
           }}
           disabled={!imageUrl || imageDownloading}
         >
           {imageDownloading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
-            <Download className="w-5 h-5" />
+            <Download className="w-5 h-5 flex-shrink-0" />
           )}
-          Download Gambar
+          Download Gambar ({imageFormat.toUpperCase()})
         </Button>
 
         <p className="text-xs text-muted-foreground text-center">

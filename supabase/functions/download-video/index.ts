@@ -1,8 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type',
 };
 
 interface DownloadRequest {
@@ -29,28 +30,37 @@ interface CobaltResponse {
 
 // Working Cobalt instances with CORS support
 const COBALT_INSTANCES = [
-  "https://cobalt-api.kwiatekmiki.com",
-  "https://cobalt-api.meowing.de",
-  "https://capi.3kh0.net",
-  "https://cobalt-backend.canine.tools",
+  'https://api.cobalt.tools',
+  'https://cobalt-api.kwiatekmiki.com',
+  'https://cobalt-api.meowing.de',
+  'https://capi.3kh0.net',
+  'https://cobalt-backend.canine.tools',
+  'https://cobalt.crush-it.ru',
 ];
 
 serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { url, quality = "1080", format = "mp4", previewOnly = false }: DownloadRequest = await req.json();
-    
+    const {
+      url,
+      quality = '1080',
+      format = 'mp4',
+      previewOnly = false,
+    }: DownloadRequest = await req.json();
+
     console.log(`Processing download request for: ${url}`);
-    console.log(`Quality: ${quality}, Format: ${format}, PreviewOnly: ${previewOnly}`);
+    console.log(
+      `Quality: ${quality}, Format: ${format}, PreviewOnly: ${previewOnly}`
+    );
 
     if (!url) {
-      return new Response(
-        JSON.stringify({ error: "URL is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: 'URL is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const platform = detectPlatform(url);
@@ -58,8 +68,14 @@ serve(async (req: Request): Promise<Response> => {
 
     if (!platform) {
       return new Response(
-        JSON.stringify({ error: "Platform tidak didukung. Gunakan URL TikTok, Instagram, Facebook, atau YouTube." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error:
+            'Platform tidak didukung. Gunakan URL TikTok, Instagram, Facebook, atau YouTube.',
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
       );
     }
 
@@ -67,32 +83,41 @@ serve(async (req: Request): Promise<Response> => {
     const metadata = extractMetadata(url, platform);
 
     // Map quality to Cobalt format
-    const videoQuality = quality === "4k" ? "2160" : quality === "1080" ? "1080" : quality === "720" ? "720" : "480";
-    
+    const videoQuality =
+      quality === '4k'
+        ? '2160'
+        : quality === '1080'
+        ? '1080'
+        : quality === '720'
+        ? '720'
+        : '480';
+
     // Build request body for new Cobalt API (v10+)
     const requestBody = {
       url: url,
       videoQuality: videoQuality,
-      audioFormat: "mp3",
-      downloadMode: format === "mp3" ? "audio" : "auto",
-      filenameStyle: "basic",
+      audioFormat: 'mp3',
+      downloadMode: format === 'mp3' ? 'audio' : 'auto',
+      filenameStyle: 'basic',
     };
 
     // Try each instance until one works
     for (const instance of COBALT_INSTANCES) {
       try {
         console.log(`Trying instance: ${instance}`);
-        
+
         const cobaltResponse = await fetch(instance, {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify(requestBody),
         });
 
-        console.log(`Instance ${instance} response status: ${cobaltResponse.status}`);
+        console.log(
+          `Instance ${instance} response status: ${cobaltResponse.status}`
+        );
 
         if (!cobaltResponse.ok) {
           console.log(`Instance ${instance} returned ${cobaltResponse.status}`);
@@ -102,21 +127,21 @@ serve(async (req: Request): Promise<Response> => {
         const data: CobaltResponse = await cobaltResponse.json();
         console.log(`Cobalt response from ${instance}:`, JSON.stringify(data));
 
-        if (data.status === "error") {
+        if (data.status === 'error') {
           console.log(`Instance ${instance} returned error:`, data.error);
           continue;
         }
 
         // Handle picker response (multiple items like Instagram carousel)
-        if (data.status === "picker" && data.picker && data.picker.length > 0) {
+        if (data.status === 'picker' && data.picker && data.picker.length > 0) {
           const firstThumb = data.picker[0]?.thumb || data.thumb;
-          
+
           if (previewOnly) {
             return new Response(
               JSON.stringify({
                 success: true,
                 platform,
-                type: "preview",
+                type: 'preview',
                 metadata: {
                   ...metadata,
                   title: metadata.title || `${platform}_carousel`,
@@ -124,41 +149,47 @@ serve(async (req: Request): Promise<Response> => {
                 thumbnail: firstThumb,
                 itemCount: data.picker.length,
               }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
             );
           }
-          
+
           return new Response(
             JSON.stringify({
               success: true,
               platform,
-              type: "picker",
+              type: 'picker',
               metadata: metadata,
               thumbnail: firstThumb,
               options: data.picker.map((item, index) => ({
                 id: index,
                 url: item.url,
                 thumbnail: item.thumb,
-                type: item.type || "video",
+                type: item.type || 'video',
               })),
             }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
         // Extract enhanced metadata from filename
-        const filenameMetadata = parseFilenameMetadata(data.filename || '', platform);
-        
+        const filenameMetadata = parseFilenameMetadata(
+          data.filename || '',
+          platform
+        );
+
         // Merge all metadata sources
-        const title = data.filename 
-          ? cleanFilename(data.filename) 
+        const title = data.filename
+          ? cleanFilename(data.filename)
           : metadata.title || `${platform}_video_${Date.now()}`;
-        
+
         // Get author from multiple sources
         const author = metadata.author || filenameMetadata.author;
-        
+
         // Get thumbnail URL - construct from platform if not provided
-        const thumbnail = data.thumb || getThumbnailUrl(url, platform, metadata.videoId);
+        const thumbnail =
+          data.thumb || getThumbnailUrl(url, platform, metadata.videoId);
 
         // Build complete metadata with music info
         const completeMetadata = {
@@ -176,21 +207,24 @@ serve(async (req: Request): Promise<Response> => {
             JSON.stringify({
               success: true,
               platform,
-              type: "preview",
+              type: 'preview',
               metadata: completeMetadata,
               thumbnail,
             }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
         // Handle tunnel/redirect response
-        if ((data.status === "tunnel" || data.status === "redirect") && data.url) {
+        if (
+          (data.status === 'tunnel' || data.status === 'redirect') &&
+          data.url
+        ) {
           return new Response(
             JSON.stringify({
               success: true,
               platform,
-              type: "direct",
+              type: 'direct',
               downloadUrl: data.url,
               filename: completeMetadata.title,
               thumbnail,
@@ -198,7 +232,7 @@ serve(async (req: Request): Promise<Response> => {
               quality,
               format,
             }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
@@ -208,7 +242,7 @@ serve(async (req: Request): Promise<Response> => {
             JSON.stringify({
               success: true,
               platform,
-              type: "direct",
+              type: 'direct',
               downloadUrl: data.url,
               filename: completeMetadata.title,
               thumbnail,
@@ -216,10 +250,9 @@ serve(async (req: Request): Promise<Response> => {
               quality,
               format,
             }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-
       } catch (instanceError) {
         console.error(`Error with instance ${instance}:`, instanceError);
         continue;
@@ -228,27 +261,37 @@ serve(async (req: Request): Promise<Response> => {
 
     // All instances failed
     return new Response(
-      JSON.stringify({ 
-        error: "Tidak dapat memproses video ini. Coba lagi nanti atau gunakan URL yang berbeda.",
-        details: "Semua server sedang sibuk atau tidak dapat mengakses video ini."
+      JSON.stringify({
+        success: false,
+        error:
+          'Tidak dapat memproses link ini. Coba lagi nanti atau gunakan link yang berbeda.',
+        details:
+          'Semua server sedang sibuk atau tidak dapat mengakses konten ini.',
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
     );
-
   } catch (error: any) {
-    console.error("Error processing download:", error);
+    console.error('Error processing download:', error);
     return new Response(
-      JSON.stringify({ error: error.message || "Gagal memproses video" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Gagal memproses request',
+        details: 'Terjadi kesalahan internal pada server.',
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
     );
   }
 });
 
 function detectPlatform(url: string): string | null {
   const patterns: Record<string, RegExp[]> = {
-    youtube: [
-      /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)/i,
-    ],
+    youtube: [/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)/i],
     tiktok: [
       /tiktok\.com\/@[\w.-]+\/video\/\d+/i,
       /tiktok\.com\/t\/\w+/i,
@@ -276,12 +319,15 @@ function detectPlatform(url: string): string | null {
   return null;
 }
 
-function extractMetadata(url: string, platform: string): { author?: string; videoId?: string; title?: string } {
+function extractMetadata(
+  url: string,
+  platform: string
+): { author?: string; videoId?: string; title?: string } {
   const metadata: { author?: string; videoId?: string; title?: string } = {};
 
   try {
     switch (platform) {
-      case "tiktok": {
+      case 'tiktok': {
         // Extract username from TikTok URL: tiktok.com/@username/video/123
         const match = url.match(/tiktok\.com\/@([\w.-]+)\/video\/(\d+)/i);
         if (match) {
@@ -290,22 +336,31 @@ function extractMetadata(url: string, platform: string): { author?: string; vide
         }
         break;
       }
-      case "instagram": {
+      case 'instagram': {
         // Extract post ID and username from Instagram URL
-        const postMatch = url.match(/instagram\.com\/(?:p|reel|reels)\/([^/?]+)/i);
+        const postMatch = url.match(
+          /instagram\.com\/(?:p|reel|reels)\/([^/?]+)/i
+        );
         if (postMatch) {
           metadata.videoId = postMatch[1];
         }
         // Try to extract username if available in URL
         const userMatch = url.match(/instagram\.com\/([\w.-]+)\/(?:p|reel)/i);
-        if (userMatch && userMatch[1] !== 'p' && userMatch[1] !== 'reel' && userMatch[1] !== 'reels') {
+        if (
+          userMatch &&
+          userMatch[1] !== 'p' &&
+          userMatch[1] !== 'reel' &&
+          userMatch[1] !== 'reels'
+        ) {
           metadata.author = `@${userMatch[1]}`;
         }
         break;
       }
-      case "youtube": {
+      case 'youtube': {
         // Extract video ID from YouTube URL
-        const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/i);
+        const match = url.match(
+          /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([^&?/]+)/i
+        );
         if (match) {
           metadata.videoId = match[1];
         }
@@ -316,9 +371,12 @@ function extractMetadata(url: string, platform: string): { author?: string; vide
         }
         break;
       }
-      case "facebook": {
+      case 'facebook': {
         // Extract video ID from Facebook URL
-        const videoMatch = url.match(/videos\/(\d+)/i) || url.match(/v=(\d+)/i) || url.match(/reel\/(\d+)/i);
+        const videoMatch =
+          url.match(/videos\/(\d+)/i) ||
+          url.match(/v=(\d+)/i) ||
+          url.match(/reel\/(\d+)/i);
         if (videoMatch) {
           metadata.videoId = videoMatch[1];
         }
@@ -331,27 +389,34 @@ function extractMetadata(url: string, platform: string): { author?: string; vide
       }
     }
   } catch (e) {
-    console.log("Error extracting metadata:", e);
+    console.log('Error extracting metadata:', e);
   }
 
   return metadata;
 }
 
 // Parse metadata from Cobalt filename and extract music info
-function parseFilenameMetadata(filename: string, platform: string): { 
-  title?: string; 
-  author?: string; 
-  musicInfo?: { title?: string; author?: string } 
+function parseFilenameMetadata(
+  filename: string,
+  platform: string
+): {
+  title?: string;
+  author?: string;
+  musicInfo?: { title?: string; author?: string };
 } {
-  const result: { title?: string; author?: string; musicInfo?: { title?: string; author?: string } } = {};
-  
+  const result: {
+    title?: string;
+    author?: string;
+    musicInfo?: { title?: string; author?: string };
+  } = {};
+
   if (!filename) return result;
-  
+
   // Clean filename
-  const cleanName = filename.replace(/\.[^/.]+$/, ""); // Remove extension
-  
+  const cleanName = filename.replace(/\.[^/.]+$/, ''); // Remove extension
+
   switch (platform) {
-    case "tiktok": {
+    case 'tiktok': {
       // Format: tiktok_username_videoid or similar
       const parts = cleanName.split('_');
       if (parts.length >= 2) {
@@ -367,7 +432,7 @@ function parseFilenameMetadata(filename: string, platform: string): {
       }
       break;
     }
-    case "instagram": {
+    case 'instagram': {
       // Format: instagram_username_postid
       const parts = cleanName.split('_');
       if (parts.length >= 2) {
@@ -375,17 +440,20 @@ function parseFilenameMetadata(filename: string, platform: string): {
       }
       break;
     }
-    case "youtube": {
+    case 'youtube': {
       // Format: youtube_title_videoid or Video Title [videoid]
       const bracketMatch = cleanName.match(/^(.+?)\s*\[([^\]]+)\]$/);
       if (bracketMatch) {
         result.title = bracketMatch[1].trim();
       } else {
-        result.title = cleanName.replace(/youtube[_-]/i, '').replace(/[_-]+/g, ' ').trim();
+        result.title = cleanName
+          .replace(/youtube[_-]/i, '')
+          .replace(/[_-]+/g, ' ')
+          .trim();
       }
       break;
     }
-    case "facebook": {
+    case 'facebook': {
       // Format: facebook_pagename_videoid
       const parts = cleanName.split('_');
       if (parts.length >= 2) {
@@ -394,16 +462,16 @@ function parseFilenameMetadata(filename: string, platform: string): {
       break;
     }
   }
-  
+
   // Try to detect music/audio info from common patterns
   // Pattern: "Song Title - Artist Name" or "Artist - Song"
   const musicPatterns = [
-    /♪\s*(.+?)\s*[-–]\s*(.+)/i,           // ♪ Song - Artist
-    /🎵\s*(.+?)\s*[-–]\s*(.+)/i,           // 🎵 Song - Artist
+    /♪\s*(.+?)\s*[-–]\s*(.+)/i, // ♪ Song - Artist
+    /🎵\s*(.+?)\s*[-–]\s*(.+)/i, // 🎵 Song - Artist
     /(?:song|track|music)[:\s]+(.+?)\s*[-–]\s*(.+)/i,
-    /(?:by|feat\.?|ft\.?)\s+(.+)/i,       // by Artist or feat. Artist
+    /(?:by|feat\.?|ft\.?)\s+(.+)/i, // by Artist or feat. Artist
   ];
-  
+
   for (const pattern of musicPatterns) {
     const match = cleanName.match(pattern);
     if (match) {
@@ -415,23 +483,27 @@ function parseFilenameMetadata(filename: string, platform: string): {
       break;
     }
   }
-  
+
   return result;
 }
 
 function cleanFilename(filename: string): string {
   // Remove file extension and clean up the filename
   return filename
-    .replace(/\.[^/.]+$/, "") // Remove extension
-    .replace(/[_-]+/g, " ")   // Replace underscores/dashes with spaces
+    .replace(/\.[^/.]+$/, '') // Remove extension
+    .replace(/[_-]+/g, ' ') // Replace underscores/dashes with spaces
     .trim();
 }
 
-function getThumbnailUrl(url: string, platform: string, videoId?: string): string | undefined {
+function getThumbnailUrl(
+  url: string,
+  platform: string,
+  videoId?: string
+): string | undefined {
   if (!videoId) return undefined;
-  
+
   switch (platform) {
-    case "youtube":
+    case 'youtube':
       // YouTube thumbnail URLs
       return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
     default:
