@@ -177,7 +177,7 @@ export function DownloadForm() {
       if (error) throw error;
 
       if (!data.success) {
-        throw new Error(data.error || "Gagal mendapatkan preview");
+        throw new Error(data.error || data.details || "Gagal mendapatkan preview");
       }
 
       setVideoMetadata({
@@ -255,7 +255,7 @@ export function DownloadForm() {
       if (error) throw error;
 
       if (!data.success) {
-        throw new Error(data.error || "Gagal memproses video");
+        throw new Error(data.error || data.details || "Gagal memproses video");
       }
 
       setDownloadProgress(50);

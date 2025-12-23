@@ -30,6 +30,7 @@ interface CobaltResponse {
 
 // Working Cobalt instances with CORS support
 // Working Cobalt instances with CORS support
+// Comprehensive list of known working Cobalt instances
 const COBALT_INSTANCES = [
   'https://api.cobalt.tools',
   'https://cobalt-api.meowing.de',
@@ -39,11 +40,14 @@ const COBALT_INSTANCES = [
   'https://cobalt.sm64.fun',
   'https://cobalt.crush-it.ru',
   'https://api.cobalt.best',
+  'https://cobalt.shun.pw',
+  'https://cobalt.hyonsu.com',
+  'https://cobalt.qwer.host',
 ];
 
-const FETCH_TIMEOUT = 12000; // 12 seconds timeout for each instance
+const FETCH_TIMEOUT = 12000;
 
-async function fetchWithTimeout(url: string, options: any) {
+async function fetchWithTimeout(url: string, options: RequestInit) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
   try {
@@ -78,10 +82,13 @@ serve(async (req: Request): Promise<Response> => {
     );
 
     if (!url) {
-      return new Response(JSON.stringify({ success: false, error: 'URL is required' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: 'URL is required' }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const platform = detectPlatform(url);
@@ -122,53 +129,102 @@ serve(async (req: Request): Promise<Response> => {
       filenameStyle: 'basic',
     };
 
+    // Track common errors to show a better fallback message
+    const errorCounts: Record<string, number> = {};
+    let lastErrorMessage = '';
+
     // Try each instance until one works
     for (const instance of COBALT_INSTANCES) {
-      try {
-        console.log(`Trying instance: ${instance}`);
+      // Try both standard (/) and legacy (/api/json) endpoints
+      const endpoints = [instance, `${instance}/api/json`].slice(
+        0,
+        instance.includes('api.cobalt.tools') ? 1 : 2
+      );
 
-        const cobaltResponse = await fetchWithTimeout(instance, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`Trying endpoint: ${endpoint}`);
 
-        console.log(
-          `Instance ${instance} response status: ${cobaltResponse.status}`
-        );
+          const cobaltResponse = await fetchWithTimeout(endpoint, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          });
 
-        if (!cobaltResponse.ok) {
-          console.log(`Instance ${instance} returned ${cobaltResponse.status}`);
-          continue;
-        }
+          console.log(
+            `Endpoint ${endpoint} response status: ${cobaltResponse.status}`
+          );
 
-        const data: CobaltResponse = await cobaltResponse.json();
-        console.log(`Cobalt response from ${instance}:`, JSON.stringify(data));
+          if (!cobaltResponse.ok) {
+            const errorText = await cobaltResponse
+              .text()
+              .catch(() => 'Unknown error');
+            console.log(
+              `Endpoint ${endpoint} failed with ${cobaltResponse.status}: ${errorText}`
+            );
+            continue;
+          }
 
-        if (data.status === 'error') {
-          console.log(`Instance ${instance} returned error:`, data.error);
-          continue;
-        }
+          const data: CobaltResponse = await cobaltResponse.json();
+          console.log(
+            `Cobalt response from ${endpoint}:`,
+            JSON.stringify(data)
+          );
 
-        // Handle picker response (multiple items like Instagram carousel)
-        if (data.status === 'picker' && data.picker && data.picker.length > 0) {
-          const firstThumb = data.picker[0]?.thumb || data.thumb;
+          if (data.status === 'error') {
+            const errorCode = data.error?.code || 'unknown';
+            errorCounts[errorCode] = (errorCounts[errorCode] || 0) + 1;
+            lastErrorMessage = data.error?.code || 'API Error';
+            console.log(`Endpoint ${endpoint} returned error:`, data.error);
+            continue;
+          }
 
-          if (previewOnly) {
+          // Handle successful response
+          if (
+            data.status === 'picker' &&
+            data.picker &&
+            data.picker.length > 0
+          ) {
+            const firstThumb = data.picker[0]?.thumb || data.thumb;
+
+            if (previewOnly) {
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  platform,
+                  type: 'preview',
+                  metadata: {
+                    ...metadata,
+                    title: metadata.title || `${platform}_carousel`,
+                  },
+                  thumbnail: firstThumb,
+                  itemCount: data.picker.length,
+                }),
+                {
+                  headers: {
+                    ...corsHeaders,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+            }
+
             return new Response(
               JSON.stringify({
                 success: true,
                 platform,
-                type: 'preview',
-                metadata: {
-                  ...metadata,
-                  title: metadata.title || `${platform}_carousel`,
-                },
+                type: 'picker',
+                metadata: metadata,
                 thumbnail: firstThumb,
-                itemCount: data.picker.length,
+                options: data.picker.map((item, index) => ({
+                  id: index,
+                  url: item.url,
+                  thumbnail: item.thumb,
+                  type: item.type || 'video',
+                })),
               }),
               {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -176,117 +232,91 @@ serve(async (req: Request): Promise<Response> => {
             );
           }
 
-          return new Response(
-            JSON.stringify({
-              success: true,
-              platform,
-              type: 'picker',
-              metadata: metadata,
-              thumbnail: firstThumb,
-              options: data.picker.map((item, index) => ({
-                id: index,
-                url: item.url,
-                thumbnail: item.thumb,
-                type: item.type || 'video',
-              })),
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          const filenameMetadata = parseFilenameMetadata(
+            data.filename || '',
+            platform
           );
+          const title = data.filename
+            ? cleanFilename(data.filename)
+            : metadata.title || `${platform}_video_${Date.now()}`;
+          const author = metadata.author || filenameMetadata.author;
+          const thumbnail =
+            data.thumb || getThumbnailUrl(url, platform, metadata.videoId);
+
+          const completeMetadata = {
+            title: filenameMetadata.title || title,
+            author: author,
+            videoId: metadata.videoId,
+            musicInfo: filenameMetadata.musicInfo || null,
+            originalFilename: data.filename,
+            sourceUrl: url,
+          };
+
+          if (previewOnly) {
+            return new Response(
+              JSON.stringify({
+                success: true,
+                platform,
+                type: 'preview',
+                metadata: completeMetadata,
+                thumbnail,
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+
+          if (
+            data.status === 'tunnel' ||
+            data.status === 'redirect' ||
+            data.url
+          ) {
+            return new Response(
+              JSON.stringify({
+                success: true,
+                platform,
+                type: 'direct',
+                downloadUrl: data.url || data.picker?.[0]?.url,
+                filename: completeMetadata.title,
+                thumbnail,
+                metadata: completeMetadata,
+                quality,
+                format,
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+        } catch (err: unknown) {
+          console.error(`Error with endpoint ${endpoint}:`, err);
+          continue;
         }
-
-        // Extract enhanced metadata from filename
-        const filenameMetadata = parseFilenameMetadata(
-          data.filename || '',
-          platform
-        );
-
-        // Merge all metadata sources
-        const title = data.filename
-          ? cleanFilename(data.filename)
-          : metadata.title || `${platform}_video_${Date.now()}`;
-
-        // Get author from multiple sources
-        const author = metadata.author || filenameMetadata.author;
-
-        // Get thumbnail URL - construct from platform if not provided
-        const thumbnail =
-          data.thumb || getThumbnailUrl(url, platform, metadata.videoId);
-
-        // Build complete metadata with music info
-        const completeMetadata = {
-          title: filenameMetadata.title || title,
-          author: author,
-          videoId: metadata.videoId,
-          musicInfo: filenameMetadata.musicInfo || null,
-          originalFilename: data.filename,
-          sourceUrl: url,
-        };
-
-        // Handle preview only request
-        if (previewOnly) {
-          return new Response(
-            JSON.stringify({
-              success: true,
-              platform,
-              type: 'preview',
-              metadata: completeMetadata,
-              thumbnail,
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Handle tunnel/redirect response
-        if (
-          (data.status === 'tunnel' || data.status === 'redirect') &&
-          data.url
-        ) {
-          return new Response(
-            JSON.stringify({
-              success: true,
-              platform,
-              type: 'direct',
-              downloadUrl: data.url,
-              filename: completeMetadata.title,
-              thumbnail,
-              metadata: completeMetadata,
-              quality,
-              format,
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Handle legacy response format
-        if (data.url) {
-          return new Response(
-            JSON.stringify({
-              success: true,
-              platform,
-              type: 'direct',
-              downloadUrl: data.url,
-              filename: completeMetadata.title,
-              thumbnail,
-              metadata: completeMetadata,
-              quality,
-              format,
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      } catch (instanceError) {
-        console.error(`Error with instance ${instance}:`, instanceError);
-        continue;
       }
     }
 
     // All instances failed
+    let friendlyError =
+      'Tidak dapat memproses link ini. Coba lagi nanti atau gunakan link yang berbeda.';
+
+    if (errorCounts['rate-limit'] > 0) {
+      friendlyError =
+        'Server sedang sibuk (Rate Limit). Silakan coba lagi dalam beberapa menit.';
+    } else if (
+      errorCounts['error-api-youtube-blocked'] > 0 ||
+      errorCounts['error-api-youtube-unavailable'] > 0
+    ) {
+      friendlyError =
+        'Maaf, video YouTube ini tidak dapat diakses (mungkin dibatasi wilayah atau privat).';
+    }
+
     return new Response(
       JSON.stringify({
         success: false,
-        error:
-          'Tidak dapat memproses link ini. Coba lagi nanti atau gunakan link yang berbeda.',
+        error: friendlyError,
         details:
+          lastErrorMessage ||
           'Semua server sedang sibuk atau tidak dapat mengakses konten ini.',
       }),
       {
@@ -294,12 +324,13 @@ serve(async (req: Request): Promise<Response> => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
-  } catch (error: any) {
-    console.error('Error processing download:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error processing download:', err);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Gagal memproses request',
+        error: err.message || 'Gagal memproses request',
         details: 'Terjadi kesalahan internal pada server.',
       }),
       {
