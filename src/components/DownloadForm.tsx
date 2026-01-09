@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { videoAPI } from "@/lib/api";
 import { AlertCircle, CheckCircle, Copyright, Download, ExternalLink, Eye, FileText, Globe, Image, Info, Link2, Loader2, Music, Sparkles, User, Video, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -170,14 +170,10 @@ export function DownloadForm() {
     setVideoMetadata(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('download-video', {
-        body: { url, previewOnly: true }
-      });
-
-      if (error) throw error;
+      const data = await videoAPI.previewVideo(url);
 
       if (!data.success) {
-        throw new Error(data.error || data.details || "Gagal mendapatkan preview");
+        throw new Error(data.error || "Gagal mendapatkan preview");
       }
 
       setVideoMetadata({
@@ -244,18 +240,14 @@ export function DownloadForm() {
     try {
       const quality = resolution === "4k" ? "4k" : resolution === "1080p" ? "1080" : "720";
 
-      const { data, error } = await supabase.functions.invoke('download-video', {
-        body: {
-          url,
-          quality,
-          format: format === "audio" ? "mp3" : "mp4"
-        }
+      const data = await videoAPI.downloadVideo({
+        url,
+        quality,
+        format: format === "audio" ? "mp3" : "mp4"
       });
 
-      if (error) throw error;
-
       if (!data.success) {
-        throw new Error(data.error || data.details || "Gagal memproses video");
+        throw new Error(data.error || "Gagal memproses video");
       }
 
       setDownloadProgress(50);
