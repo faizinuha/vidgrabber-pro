@@ -11,7 +11,11 @@ app = FastAPI(title="VidGrabber Pro API")
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Dalam production, ganti dengan domain spesifik
+    allow_origins=[
+        "http://localhost:5173",
+        "https://vidgrabbers.vercel.app",
+        "https://vidgrabber-pro.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
